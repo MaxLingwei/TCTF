@@ -1,6 +1,6 @@
 clear all;
 close all;
-img_origin = double(imread('173036.jpg'));
+img_origin = double(imread('178054.jpg'));
 img_origin = double(img_origin) / 255.0;
 
 p = 0.7;

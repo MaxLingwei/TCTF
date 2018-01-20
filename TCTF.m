@@ -1,7 +1,8 @@
 function [X, Y, C, r] = TCTF(M, Omega, r0, img_origin)
-
-max_iter = 1000;
+min_rank = [25, 5, 5];
+max_iter = 150;
 epsilon = 1e-5;
+normdata = norm(M(Omega));
 value_pixel = M(Omega);
 r1 = r0;
 [n1, n2, n3] = size(M);
@@ -32,6 +33,12 @@ for iter = 1:max_iter
     end
     
     C = real(ifft(Chat, [], 3));
+    diff = norm(C(Omega) - M(Omega)) / normdata;
+    if diff < 1e-8
+        C(Omega) = M(Omega);
+        break;
+    end
+    
     C(Omega) = value_pixel;
     
     rse_set = [rse_set, RSE(img_origin, C)];
@@ -49,12 +56,16 @@ for iter = 1:max_iter
         Y_temp = pinv(XtX) * get_Xhat' * Chat(:, :, k);
         Yhat{k} = Y_temp;
         
+        
+    end
+    if sum(r1) > sum(min_rank)
         [Xhat, Yhat, r1] = estimation_rank_t(Xhat, Yhat, r1);
     end
-    diff = Chat - Chat_k;
-    if max(abs(diff(:))) < epsilon && cal_diff(Xhat, Xhat_k) < epsilon && cal_diff(Yhat, Yhat_k) < epsilon
-        break;
-    end
+    
+%     diff = Chat - Chat_k;
+%     if max(abs(diff(:))) < epsilon && cal_diff(Xhat, Xhat_k) < epsilon && cal_diff(Yhat, Yhat_k) < epsilon
+%         break;
+%     end
 %     if abs(max(max(max(Xhat - Xhat_k)))) < epsilon && abs(max(max(max(Yhat - Yhat_k)))) < epsilon && abs(max(max(max(Chat - Chat_k)))) < epsilon
 %         break;
 %     end
