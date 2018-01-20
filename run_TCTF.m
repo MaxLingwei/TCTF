@@ -1,6 +1,8 @@
 clear all;
 close all;
-img_origin = double(imread('124084.jpg'));
+img_origin = double(imread('173036.jpg'));
+img_origin = double(img_origin) / 255.0;
+
 p = 0.7;
 sample_index = rand(size(img_origin)) < p;
 %load('sample_index.mat');
@@ -16,8 +18,8 @@ r = [];
 M = zeros(size(img_origin));
 [n1, n2, n3] = size(img_sample);
 for i = 1:n3
-    get_X = X(1:n1, 1:r(i), i);
-    get_Y = Y(1:r(i), 1:n2, i);
+    get_X = X{i};
+    get_Y = Y{i};
     M(:, :, i) = get_X * get_Y;
 end
 result = real(ifft(M, [], 3));
@@ -26,5 +28,5 @@ result = real(ifft(M, [], 3));
 psnr = PSNR(n1, n2, n3, img_origin, C)
 
 
-pic = cat(2, uint8(img_origin), uint8(img_sample), uint8(C));
+pic = cat(2, img_origin, img_sample, C);
 figure; montage(pic);

@@ -7,8 +7,8 @@ r1 = r0;
 [n1, n2, n3] = size(M);
 rhat = max(r0);
 
-%[Xhat, Yhat] = initial_Frequency_Domain(r0, M);
-[Xhat, Yhat] = initial_Time_Domain(r0, M);
+
+[Xhat, Yhat] = initial_2(r0, img_origin, Omega)
 
 rse_set = [];
 %load('hat.mat');
@@ -21,8 +21,8 @@ for iter = 1:max_iter
     end
     
     for k = 1:n3
-        get_Xhat = Xhat(1:n1, 1:r1(k), k);
-        get_Yhat = Yhat(1:r1(k), 1:n2, k);
+        get_Xhat = Xhat{k};
+        get_Yhat = Yhat{k};
         %C_temp = get_Xhat * get_Yhat;
         %Chat(1:size(C_temp, 1), 1:size(C_temp, 2), k) = C_temp;
         Chat(:, :, k) = get_Xhat * get_Yhat;
@@ -39,33 +39,38 @@ for iter = 1:max_iter
     Chat = fft(C, [], 3);
     
     for k = 1:n3
-        get_Yhat = Yhat(1:r1(k), 1:n2, k);
+        get_Yhat = Yhat{k};
         YtY = get_Yhat * get_Yhat';
         X_temp = Chat(:, :, k) * get_Yhat' * pinv(YtY);
-        Xhat(1:size(X_temp, 1), 1:size(X_temp, 2), k) = X_temp;
+        Xhat{k} = X_temp;
         
-        get_Xhat = Xhat(1:n1, 1:r1(k), k);
+        get_Xhat = Xhat{k};
         XtX = get_Xhat' * get_Xhat;
         Y_temp = pinv(XtX) * get_Xhat' * Chat(:, :, k);
-        Yhat(1:size(Y_temp, 1), 1:size(Y_temp, 2), k) = Y_temp;
+        Yhat{k} = Y_temp;
         
         [Xhat, Yhat, r1] = estimation_rank_t(Xhat, Yhat, r1);
     end
-    if abs(max(max(max(Xhat - Xhat_k)))) < epsilon && abs(max(max(max(Yhat - Yhat_k)))) < epsilon && abs(max(max(max(Chat - Chat_k)))) < epsilon
+    diff = Chat - Chat_k;
+    if max(abs(diff(:))) < epsilon && cal_diff(Xhat, Xhat_k) < epsilon && cal_diff(Yhat, Yhat_k) < epsilon
         break;
     end
+%     if abs(max(max(max(Xhat - Xhat_k)))) < epsilon && abs(max(max(max(Yhat - Yhat_k)))) < epsilon && abs(max(max(max(Chat - Chat_k)))) < epsilon
+%         break;
+%     end
 end
 X = Xhat;
 Y = Yhat;
 r = r1;
 
 function [Xhat, Yhat, r1] = estimation_rank_t(Xhat, Yhat, r0)
-[n1, rhat, n3] = size(Xhat);
+min_rank = [25, 5, 5];
+n3 = length(Xhat);
 multi_rank = r0;
 eigen_recorder = [];
 eigen_val = [];
 for i = 1:n3
-    XtX = Xhat(:, :, i)' * Xhat(:, :, i);
+    XtX = Xhat{i}' * Xhat{i};
     eigen_XtX = real(eig(XtX));
     eigen_val = [eigen_val; eigen_XtX];
     eigen_recorder = [eigen_recorder; length(eigen_XtX)];
@@ -79,8 +84,6 @@ tau_k = (sum(r0) - 1) * lambda_tk / (sum(quotients) - lambda_tk);
 Xhat_decrease = Xhat;
 Yhat_decrease = Yhat;
 if tau_k >= 10
-    Xhat_decrease = zeros(size(Xhat));
-    Yhat_decrease = zeros(size(Xhat));
     eig_val_cum = cumsum(eigen_val_sort);
     sk_set = find(eig_val_cum / sum(eigen_val_sort) >= 0.95);
     sk = sk_set(1);
@@ -93,12 +96,13 @@ if tau_k >= 10
         if length(mk_i) == 0
             mk_i = 0;
         end
-        multi_rank(i) = multi_rank(i) - mk_i;
-        [U, S, V] = svd(Xhat(:, :, i) * Yhat(:, :, i));
+        
+        multi_rank(i) = max(multi_rank(i) - mk_i, min_rank(i));
+        [U, S, V] = svd(Xhat{i} * Yhat{i});
         temp_US = U(:, 1:multi_rank(i)) * S(1:multi_rank(i), 1:multi_rank(i));
-        Xhat_decrease(1:size(temp_US, 1), 1:size(temp_US, 2), i) = temp_US;
+        Xhat_decrease{i} = temp_US;
         temp_V = V(:, 1:multi_rank(i))';
-        Yhat_decrease(1:size(temp_V, 1), 1:size(temp_V, 2), i) = temp_V;
+        Yhat_decrease{i} = temp_V;
     end
     
 end
@@ -141,11 +145,20 @@ end
 test_eigen_val = eigen;
 
 function [X, Y] = initial_2(r0, Origin, Omega)
-TC=randn(r0);
+TC=randn(size(Origin));
 TC(Omega)=Origin(Omega);
 TC=fft(TC,[],3);
-for i = 1:len(r0)
+for i = 1:length(r0)
     [Uk,Sigmak,Vk]=svds(TC(:,:,i),r0(i));
     X{i} = Uk*Sigmak;
     Y{i} = Vk';
 end
+
+function [max_diff] = cal_diff(A, B)
+temp = [];
+c = [];
+for i = 1:length(A)
+    c = A{i} - B{i};
+    temp = [temp; c(:)];
+end
+max_diff = max(abs(temp));
